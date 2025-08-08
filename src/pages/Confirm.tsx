@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Loader2 } from 'lucide-react';
 
 const Confirm = () => {
   const { toast } = useToast();
   const [email, setEmail] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<boolean>(false);
+  const [resending, setResending] = useState<boolean>(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
@@ -27,10 +28,15 @@ const Confirm = () => {
 
   const resend = async () => {
     if (!email) return;
-    const redirectTo = `${window.location.origin}/confirm`;
-    const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo } });
-    if (error) toast({ title: 'Resend failed', description: error.message, variant: 'destructive' });
-    else toast({ title: 'Email sent', description: 'Check your inbox for the verification link.' });
+    setResending(true);
+    try {
+      const redirectTo = `${window.location.origin}/confirm`;
+      const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo } });
+      if (error) toast({ title: 'Resend failed', description: error.message, variant: 'destructive' });
+      else toast({ title: 'Email sent', description: 'Check your inbox for the verification link.' });
+    } finally {
+      setResending(false);
+    }
   };
 
   return (
@@ -48,7 +54,10 @@ const Confirm = () => {
           <div>
             <h1 className="text-2xl font-bold text-foreground mb-2">Confirm your email</h1>
             <p className="text-muted-foreground mb-6">We sent a verification link to {email ?? 'your email'}.</p>
-            <Button onClick={resend}>Resend Email</Button>
+            <Button onClick={resend} disabled={resending}>
+              {resending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {resending ? 'Sending...' : 'Resend Email'}
+            </Button>
           </div>
         )}
       </section>

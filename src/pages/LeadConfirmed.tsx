@@ -1,6 +1,13 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 
 const LeadConfirmed = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const t = setTimeout(() => navigate('/', { replace: true }), 3000);
+    return () => clearTimeout(t);
+  }, [navigate]);
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <section className="w-full max-w-md text-center bg-gradient-card p-8 rounded-2xl shadow-card border border-border">

@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Mail, User, CheckCircle, Building2, AlertCircle } from 'lucide-react';
+import { Mail, User, CheckCircle, Building2, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { validateLeadForm, ValidationError } from '@/lib/validation';
 import { supabase } from '@/integrations/supabase/client';
 import { useLeadStore } from '@/lib/lead-store';
 import { useToast } from '@/components/ui/use-toast';
-
 
 export const LeadCaptureForm = () => {
   const [formData, setFormData] = useState({ name: '', email: '', industry: '' });
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [honeypot, setHoneypot] = useState('');
+  const [showExistsDialog, setShowExistsDialog] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const { setSubmitted, addLead, sessionLeads } = useLeadStore();
   const { toast } = useToast();
 
@@ -49,9 +51,33 @@ export const LeadCaptureForm = () => {
       toast({ title: 'Almost there!', description: 'Check your email for a confirmation link.' });
     } catch (err: any) {
       console.error('Error submitting lead:', err);
-      toast({ title: 'Submission failed', description: err.message ?? 'Please try again', variant: 'destructive' });
+      const message = err?.message || '';
+      const isDuplicate = err?.status === 409 || /exist|already/i.test(message) || err?.code === 'LEAD_EXISTS';
+      if (isDuplicate) {
+        setShowExistsDialog(true);
+      } else {
+        toast({ title: 'Submission failed', description: message || 'Please try again', variant: 'destructive' });
+      }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResendExisting = async () => {
+    try {
+      setIsResending(true);
+      const email = formData.email.trim().toLowerCase();
+      if (!email) return;
+      const { error } = await supabase.functions.invoke('resend-lead-confirmation', {
+        body: { email, redirect_to: `${window.location.origin}/lead-confirmed` },
+      });
+      if (error) throw error;
+      toast({ title: 'Email resent', description: `We sent a new confirmation link to ${email}.` });
+      setShowExistsDialog(false);
+    } catch (err: any) {
+      toast({ title: 'Failed to resend', description: err?.message || 'Try again later', variant: 'destructive' });
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -91,6 +117,11 @@ export const LeadCaptureForm = () => {
                 placeholder="Your name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
+                required
+                minLength={2}
+                maxLength={80}
+                autoComplete="name"
+                pattern="^[\p{L}\p{N}\s'\-\.]{2,80}$"
                 className={`pl-10 h-12 bg-input border-border text-foreground placeholder:text-muted-foreground transition-smooth
                   ${getFieldError('name') ? 'border-destructive' : 'focus:border-accent focus:shadow-glow'}
                 `}
@@ -109,6 +140,10 @@ export const LeadCaptureForm = () => {
                 placeholder="your@email.com"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
+                required
+                inputMode="email"
+                autoComplete="email"
+                maxLength={254}
                 className={`pl-10 h-12 bg-input border-border text-foreground placeholder:text-muted-foreground transition-smooth
                   ${getFieldError('email') ? 'border-destructive' : 'focus:border-accent focus:shadow-glow'}
                 `}
@@ -158,6 +193,24 @@ export const LeadCaptureForm = () => {
           By submitting, you agree to receive updates. Unsubscribe anytime.
         </p>
       </div>
+
+      <Dialog open={showExistsDialog} onOpenChange={setShowExistsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Email already registered</DialogTitle>
+            <DialogDescription>
+              This email is already on our waitlist. Would you like us to resend the confirmation link?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExistsDialog(false)}>Close</Button>
+            <Button onClick={handleResendExisting} disabled={isResending}>
+              {isResending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+              {isResending ? 'Resending...' : 'Resend Email'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-
+import { Loader2 } from 'lucide-react';
+import { validateEmail } from '@/lib/validation';
 const Auth = () => {
   const { toast } = useToast();
   const [mode, setMode] = useState<'login' | 'signup'>('signup');
@@ -20,6 +21,11 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Basic client-side validation to harden the form
+    if (!validateEmail(email) || password.length < 8) {
+      toast({ title: 'Invalid input', description: 'Enter a valid email and a password with at least 8 characters.', variant: 'destructive' });
+      return;
+    }
     setLoading(true);
     try {
       if (mode === 'signup') {
@@ -50,9 +56,10 @@ const Auth = () => {
           {mode === 'signup' ? 'Sign up to submit leads and get early access.' : 'Enter your credentials.'}
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input type="email" placeholder="you@email.com" value={email} onChange={(e)=>setEmail(e.target.value)} required />
-          <Input type="password" placeholder="Password" value={password} onChange={(e)=>setPassword(e.target.value)} required />
-          <Button type="submit" disabled={loading} className="w-full">
+          <Input type="email" placeholder="you@email.com" value={email} onChange={(e)=>setEmail(e.target.value)} required autoComplete="email" inputMode="email" maxLength={254} />
+          <Input type="password" placeholder="Password" value={password} onChange={(e)=>setPassword(e.target.value)} required minLength={8} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />
+          <Button type="submit" disabled={loading} className="w-full" aria-busy={loading}>
+            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
             {loading ? 'Please wait...' : (mode === 'signup' ? 'Sign up' : 'Log in')}
           </Button>
         </form>

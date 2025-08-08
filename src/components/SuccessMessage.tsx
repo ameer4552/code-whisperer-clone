@@ -1,4 +1,4 @@
-import { CheckCircle, Sparkles, ArrowRight, Mail } from 'lucide-react';
+import { CheckCircle, Sparkles, ArrowRight, Mail, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLeadStore } from '@/lib/lead-store';
 import { supabase } from '@/integrations/supabase/client';
@@ -67,10 +67,12 @@ const ResendSection = () => {
   const email = latest?.email;
   const { toast } = useToast();
   const [cooldown, setCooldown] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const handleResend = async () => {
     if (!email) return;
     try {
+      setLoading(true);
       const { error, data } = await supabase.functions.invoke('resend-lead-confirmation', {
         body: { email, redirect_to: `${window.location.origin}/lead-confirmed` },
       });
@@ -93,6 +95,8 @@ const ResendSection = () => {
       } else {
         toast({ title: 'Failed to resend', description: err?.message || 'Try again later', variant: 'destructive' });
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,9 +104,9 @@ const ResendSection = () => {
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <Button onClick={handleResend} disabled={cooldown > 0} className="w-full">
-        <Mail className="w-4 h-4 mr-2" />
-        {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Confirmation Email'}
+      <Button onClick={handleResend} disabled={cooldown > 0 || loading} className="w-full">
+        {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+        {cooldown > 0 ? `Resend in ${cooldown}s` : loading ? 'Sending...' : 'Resend Confirmation Email'}
       </Button>
       <p className="text-xs text-muted-foreground">We limit resends to protect against abuse.</p>
     </div>
