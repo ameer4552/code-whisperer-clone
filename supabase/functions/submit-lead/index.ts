@@ -103,10 +103,10 @@ serve(async (req) => {
       }
       if (!success) throw new Error("Failed to insert lead after retries");
     } else if (existing.is_email_confirmed) {
-      // If already confirmed, respond generically to avoid enumeration
+      // Already confirmed; respond generically to avoid enumeration
       return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
     } else {
-      // Apply cooldown to prevent spamming and email enumeration
+      // Existing unconfirmed lead: update token if needed, optionally resend, and signal duplicate explicitly
       const lastSentAt = (existing as any).last_confirmation_sent_at ? new Date((existing as any).last_confirmation_sent_at) : null;
       if (lastSentAt && Date.now() - lastSentAt.getTime() < COOLDOWN_MS) {
         shouldSend = false;
@@ -129,14 +129,42 @@ serve(async (req) => {
             break;
           }
           // @ts-ignore
-          if (updateErr.code === "23505") {
+          if ((updateErr as any).code === "23505") {
             token = crypto.randomUUID();
             continue;
           }
           throw updateErr;
         }
         if (!success) throw new Error("Failed to update lead after retries");
+
+        // Send confirmation email for existing unconfirmed lead
+        const confirmUrl = buildConfirmUrl(token, redirect_to);
+        const safeName = escapeHtml(trimmedName);
+        const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #333;">Confirm your email</h1>
+          <p>Hi ${safeName}, thanks for joining! Please confirm your email to get started.</p>
+          <p><a href="${confirmUrl}" style="background:#4f46e5;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;display:inline-block">Confirm Email</a></p>
+          <p style="color:#666">If the button doesn't work, copy and paste this link:</p>
+          <code style="display:block;padding:12px;background:#f4f4f5;border-radius:6px;color:#111">${confirmUrl}</code>
+        </div>
+      `;
+        const emailResponse = await resend.emails.send({
+          from: "Your App <onboarding@resend.dev>",
+          to: [trimmedEmail],
+          subject: "Please confirm your email",
+          html,
+        });
+        console.log("Confirmation email sent (existing):", emailResponse);
+      } else {
+        console.log("Skipped sending confirmation email due to cooldown (existing)");
       }
+
+      return new Response(JSON.stringify({
+        error: "Lead already exists for this email",
+        code: "LEAD_EXISTS",
+        resent: shouldSend,
+      }), { status: 409, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
     if (shouldSend) {
