@@ -203,7 +203,7 @@ serve(async (req) => {
   } // end try
   catch (error: any) {
     console.error("Error in submit-lead:", error);
-    return new Response(JSON.stringify({ error: error.message || "Unknown error" }), {
+    return new Response(JSON.stringify({ error: error.error || "Unknown error" }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
