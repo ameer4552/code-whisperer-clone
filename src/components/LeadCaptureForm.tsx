@@ -44,16 +44,19 @@ export const LeadCaptureForm = () => {
 
       const { data, error: submitError } = await supabase.functions.invoke('submit-lead', { body: payload });
       if (submitError) {
-        const status = (submitError as any).status;
-        const code = (submitError as any)?.context?.code;
-        const message = (submitError as any)?.message || '';
+        const ctx = (submitError as any)?.context ?? {};
+        const status = ctx?.response?.status ?? (submitError as any)?.status;
+        const ctxErr = ctx?.error ?? {};
+        const code = ctxErr?.code ?? (submitError as any)?.code;
+        const serverMsg = ctxErr?.error || ctxErr?.message || '';
+        const message = serverMsg || (submitError as any)?.message || '';
         if (status === 409 || code === 'LEAD_EXISTS' || /exist|already|conflict/i.test(message)) {
           setShowExistsDialog(true);
           toast({
-            title: 'Lead already exists',
-            description: `A lead has already been generated for ${payload.email}. You can resend the confirmation email.`,
+            title: 'Email already exists',
+            description: `We already have a lead for ${payload.email}. Try a different email or resend the confirmation.`,
           });
-          return; // stop success flow for duplicates
+          return;
         }
         throw submitError;
       }
@@ -64,13 +67,18 @@ export const LeadCaptureForm = () => {
       toast({ title: 'Almost there!', description: 'Check your email for a confirmation link.' });
     } catch (err: any) {
       console.error('Error submitting lead:', err);
-      const message = err?.message || '';
-      const isDuplicate = err?.status === 409 || /exist|already/i.test(message) || err?.code === 'LEAD_EXISTS';
+      const ctx = (err as any)?.context ?? {};
+      const status = ctx?.response?.status ?? (err as any)?.status;
+      const ctxErr = ctx?.error ?? {};
+      const code = ctxErr?.code ?? (err as any)?.code;
+      const serverMsg = ctxErr?.error || ctxErr?.message || '';
+      const message = serverMsg || (err as any)?.message || '';
+      const isDuplicate = status === 409 || code === 'LEAD_EXISTS' || /exist|already|conflict/i.test(message);
       if (isDuplicate) {
         setShowExistsDialog(true);
         toast({
-          title: 'Lead already exists',
-          description: `A lead has already been generated for ${formData.email?.toLowerCase()}. You can resend the confirmation email.`,
+          title: 'Email already exists',
+          description: `We already have a lead for ${formData.email?.toLowerCase()}. Try a different email or resend the confirmation.`,
         });
       } else {
         toast({ title: 'Submission failed', description: message || 'Please try again', variant: 'destructive' });
