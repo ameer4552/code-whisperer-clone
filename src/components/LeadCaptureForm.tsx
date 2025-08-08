@@ -43,7 +43,20 @@ export const LeadCaptureForm = () => {
       };
 
       const { data, error: submitError } = await supabase.functions.invoke('submit-lead', { body: payload });
-      if (submitError) throw submitError;
+      if (submitError) {
+        const status = (submitError as any).status;
+        const code = (submitError as any)?.context?.code;
+        const message = (submitError as any)?.message || '';
+        if (status === 409 || code === 'LEAD_EXISTS' || /exist|already|conflict/i.test(message)) {
+          setShowExistsDialog(true);
+          toast({
+            title: 'Lead already exists',
+            description: `A lead has already been generated for ${payload.email}. You can resend the confirmation email.`,
+          });
+          return; // stop success flow for duplicates
+        }
+        throw submitError;
+      }
 
       addLead({ name: payload.name, email: payload.email, submitted_at: new Date().toISOString() });
       setSubmitted(true);
