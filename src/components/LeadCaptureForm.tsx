@@ -1,78 +1,90 @@
 import { useState, useEffect } from 'react';
-import { Mail, User, CheckCircle, Building2 } from 'lucide-react';
+import { Mail, User, CheckCircle, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { validateLeadForm, ValidationError } from '@/lib/validation';
 import { supabase } from '@/integrations/supabase/client';
+import { useLeadStore } from '@/lib/lead-store';
+import { useToast } from '@/components/ui/use-toast';
+import { Link } from 'react-router-dom';
 
 export const LeadCaptureForm = () => {
   const [formData, setFormData] = useState({ name: '', email: '', industry: '' });
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
-  const [submitted, setSubmitted] = useState(false);
-  const [leads, setLeads] = useState<
-    Array<{ name: string; email: string; industry: string; submitted_at: string }>
-  >([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [honeypot, setHoneypot] = useState('');
+  const { setSubmitted, addLead, sessionLeads } = useLeadStore();
+  const { toast } = useToast();
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    setSubmitted(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const user = session?.user ?? null;
+      setIsAuthenticated(!!user);
+      setUserId(user?.id ?? null);
+      setIsConfirmed(!!user?.email_confirmed_at);
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user ?? null;
+      setIsAuthenticated(!!user);
+      setUserId(user?.id ?? null);
+      setIsConfirmed(!!user?.email_confirmed_at);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
   const getFieldError = (field: string) => {
     return validationErrors.find(error => error.field === field)?.message;
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Honeypot check (bots will fill this hidden field)
+    if (honeypot) return;
+
     const errors = validateLeadForm(formData);
     setValidationErrors(errors);
+    if (errors.length > 0) return;
 
-    if (errors.length === 0) {
-      // Save to database
-try {
-  const { error: emailError } = await supabase.functions.invoke('send-confirmation', {
-    body: {
-      name: formData.name,
-      email: formData.email,
-      industry: formData.industry,
-    },
-  });
+    if (!isAuthenticated) {
+      toast({ title: 'Please log in', description: 'Sign up or log in before submitting a lead.', variant: 'destructive' });
+      return;
+    }
 
-  if (emailError) {
-    console.error('Error sending confirmation email:', emailError);
-  } else {
-    console.log('Confirmation email sent successfully');
-  }
-} catch (emailError) {
-  console.error('Error calling email function:', emailError);
-}
+    if (!isConfirmed) {
+      toast({ title: 'Verify your email', description: 'Please confirm your email, then try again.', variant: 'destructive' });
+      return;
+    }
 
-      // Send confirmation email
-      try {
-        const { error: emailError } = await supabase.functions.invoke('send-confirmation', {
-          body: {
-            name: formData.name,
-            email: formData.email,
-            industry: formData.industry,
-          },
-        });
-
-        if (emailError) {
-          console.error('Error sending confirmation email:', emailError);
-        } else {
-          console.log('Confirmation email sent successfully');
-        }
-      } catch (emailError) {
-        console.error('Error calling email function:', emailError);
-      }
-
-      const lead = {
-        name: formData.name,
-        email: formData.email,
+    setIsSubmitting(true);
+    try {
+      const leadRow = {
+        user_id: userId as string,
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
         industry: formData.industry,
-        submitted_at: new Date().toISOString(), 
       };
-      setLeads([...leads, lead]);
+
+      const { error } = await supabase.from('leads').insert([leadRow]);
+      if (error) throw error;
+
+      addLead({ name: leadRow.name, email: leadRow.email, submitted_at: new Date().toISOString() });
       setSubmitted(true);
       setFormData({ name: '', email: '', industry: '' });
+      toast({ title: 'Lead submitted', description: 'Thank you! We will be in touch soon.' });
+    } catch (err: any) {
+      console.error('Error submitting lead:', err);
+      toast({ title: 'Submission failed', description: err.message ?? 'Please try again', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -82,56 +94,6 @@ try {
       setValidationErrors(prev => prev.filter(error => error.field !== field));
     }
   };
-
-  if (submitted) {
-    return (
-      <div className="w-full max-w-md mx-auto">
-        <div className="bg-gradient-card p-8 rounded-2xl shadow-card border border-border backdrop-blur-sm animate-slide-up text-center">
-          <div className="relative mb-6">
-            <div className="w-20 h-20 bg-gradient-primary rounded-full flex items-center justify-center mx-auto shadow-glow animate-glow">
-              <CheckCircle className="w-10 h-10 text-primary-foreground" />
-            </div>
-          </div>
-
-          <h2 className="text-3xl font-bold text-foreground mb-3">Welcome aboard! 🎉</h2>
-
-          <p className="text-muted-foreground mb-2">
-            Thanks for joining! We'll be in touch soon with updates.
-          </p>
-
-          <p className="text-sm text-accent mb-8">
-            You're #{leads.length} in this session
-          </p>
-
-          <div className="space-y-4">
-            <div className="p-4 bg-accent/10 rounded-lg border border-accent/20">
-              <p className="text-sm text-foreground">
-                💡 <strong>What's next?</strong>
-                <br />
-                We'll send you exclusive updates, early access, and behind-the-scenes content as we
-                build something amazing.
-              </p>
-            </div>
-
-            <Button
-              onClick={() => setSubmitted(false)}
-              variant="outline"
-              className="w-full border-border hover:bg-accent/10 transition-smooth group"
-            >
-              Submit Another Lead
-              <User className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </div>
-
-          <div className="mt-6 pt-6 border-t border-border">
-            <p className="text-xs text-muted-foreground">
-              Follow our journey on social media for real-time updates
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -145,6 +107,15 @@ try {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <input
+            type="text"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+            className="hidden"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+          />
           <div className="space-y-2">
             <div className="relative">
               <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />

@@ -57,6 +57,3 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 console.log("Hello from Functions!")
 """
-=======
-project_id = "grpzvouozarfociweami"
->>>>>>> 95125f933b6390ecef03526624e719970260e50a
