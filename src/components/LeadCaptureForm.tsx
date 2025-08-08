@@ -197,9 +197,9 @@ export const LeadCaptureForm = () => {
       <Dialog open={showExistsDialog} onOpenChange={setShowExistsDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Email already registered</DialogTitle>
+            <DialogTitle>Lead already exists for this email</DialogTitle>
             <DialogDescription>
-              This email is already on our waitlist. Would you like us to resend the confirmation link?
+              A lead has already been generated for {formData.email?.toLowerCase()}. Would you like us to resend the confirmation link?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
