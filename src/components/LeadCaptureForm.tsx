@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, User, CheckCircle, Building2, AlertCircle } from 'lucide-react';
+import { Mail, User, CheckCircle, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,6 +7,7 @@ import { validateLeadForm, ValidationError } from '@/lib/validation';
 import { supabase } from '@/integrations/supabase/client';
 import { useLeadStore } from '@/lib/lead-store';
 import { useToast } from '@/components/ui/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 
 export const LeadCaptureForm = () => {
@@ -14,6 +15,8 @@ export const LeadCaptureForm = () => {
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [honeypot, setHoneypot] = useState('');
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [lastEmail, setLastEmail] = useState('');
   const { setSubmitted, addLead, sessionLeads } = useLeadStore();
   const { toast } = useToast();
 
@@ -40,6 +43,8 @@ export const LeadCaptureForm = () => {
         redirect_to: `${window.location.origin}/lead-confirmed`,
       };
 
+      setLastEmail(payload.email);
+
       const { data, error: submitError } = await supabase.functions.invoke('submit-lead', { body: payload });
       if (submitError) throw submitError;
 
@@ -47,6 +52,7 @@ export const LeadCaptureForm = () => {
       setSubmitted(true);
       setFormData({ name: '', email: '', industry: '' });
       toast({ title: 'Almost there!', description: 'Check your email for a confirmation link.' });
+      setInfoOpen(true);
     } catch (err: any) {
       console.error('Error submitting lead:', err);
       toast({ title: 'Submission failed', description: err.message ?? 'Please try again', variant: 'destructive' });
@@ -62,6 +68,22 @@ export const LeadCaptureForm = () => {
     }
   };
 
+  const handleResend = async () => {
+    if (!lastEmail) {
+      setInfoOpen(false);
+      return;
+    }
+    try {
+      const { error } = await supabase.functions.invoke('resend-lead-confirmation', {
+        body: { email: lastEmail, redirect_to: `${window.location.origin}/lead-confirmed` },
+      });
+      if (error) throw error;
+      toast({ title: 'Resent!', description: 'If this email is registered, we’ve resent the confirmation.' });
+    } catch (err: any) {
+      console.error('Error resending confirmation:', err);
+      toast({ title: 'Could not resend', description: err.message ?? 'Please try again later', variant: 'destructive' });
+    }
+  };
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="bg-gradient-card p-8 rounded-2xl shadow-card border border-border backdrop-blur-sm animate-slide-up">
@@ -158,6 +180,21 @@ export const LeadCaptureForm = () => {
           By submitting, you agree to receive updates. Unsubscribe anytime.
         </p>
       </div>
+
+      <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
+        <DialogContent className="bg-card text-card-foreground border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Check your email</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              If this email is already on our list, we’ve sent or resent a confirmation link. Please check your inbox and spam folder.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={handleResend}>Resend</Button>
+            <Button onClick={() => setInfoOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
