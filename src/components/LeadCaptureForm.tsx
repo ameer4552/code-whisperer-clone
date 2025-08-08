@@ -55,6 +55,10 @@ export const LeadCaptureForm = () => {
       const isDuplicate = err?.status === 409 || /exist|already/i.test(message) || err?.code === 'LEAD_EXISTS';
       if (isDuplicate) {
         setShowExistsDialog(true);
+        toast({
+          title: 'Lead already exists',
+          description: `A lead has already been generated for ${formData.email?.toLowerCase()}. You can resend the confirmation email.`,
+        });
       } else {
         toast({ title: 'Submission failed', description: message || 'Please try again', variant: 'destructive' });
       }
@@ -182,10 +186,11 @@ export const LeadCaptureForm = () => {
 
           <Button
             type="submit"
-            className="w-full h-12 bg-gradient-primary text-primary-foreground font-semibold rounded-lg shadow-glow hover:shadow-[0_0_60px_hsl(210_100%_60%/0.3)] transition-smooth transform hover:scale-[1.02]"
+            disabled={isSubmitting}
+            className="w-full h-12 bg-gradient-primary text-primary-foreground font-semibold rounded-lg shadow-glow hover:shadow-[0_0_60px_hsl(210_100%_60%/0.3)] transition-smooth transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <CheckCircle className="w-5 h-5 mr-2" />
-            Get Early Access
+            {isSubmitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <CheckCircle className="w-5 h-5 mr-2" />}
+            {isSubmitting ? 'Sending...' : 'Get Early Access'}
           </Button>
         </form>
 
