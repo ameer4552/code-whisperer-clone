@@ -45,8 +45,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid input" }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
-    // Generate token
-    const token = crypto.randomUUID();
+    // Generate token with collision retry and upsert lead
+    let token = crypto.randomUUID();
 
     // Upsert: if an unconfirmed lead with same email exists, update it; else insert new.
     const { data: existing, error: findErr } = await supabase
@@ -57,31 +57,60 @@ serve(async (req) => {
       .maybeSingle();
     if (findErr) throw findErr;
 
+    const MAX_RETRIES = 5;
+
     if (!existing) {
-      const { error: insertErr } = await supabase.from("leads").insert({
-        name: trimmedName,
-        email: trimmedEmail,
-        industry: trimmedIndustry,
-        is_email_confirmed: false,
-        confirmation_token: token,
-        confirmation_sent_at: new Date().toISOString(),
-        last_confirmation_sent_at: new Date().toISOString(),
-      });
-      if (insertErr) throw insertErr;
+      let success = false;
+      for (let attempt = 0; attempt < MAX_RETRIES && !success; attempt++) {
+        const { error: insertErr } = await supabase.from("leads").insert({
+          name: trimmedName,
+          email: trimmedEmail,
+          industry: trimmedIndustry,
+          is_email_confirmed: false,
+          confirmation_token: token,
+          confirmation_sent_at: new Date().toISOString(),
+          last_confirmation_sent_at: new Date().toISOString(),
+        });
+        if (!insertErr) {
+          success = true;
+          break;
+        }
+        // Retry on unique violation for confirmation_token
+        // @ts-ignore - edge function error objects may include 'code'
+        if (insertErr.code === "23505") {
+          token = crypto.randomUUID();
+          continue;
+        }
+        throw insertErr;
+      }
+      if (!success) throw new Error("Failed to insert lead after retries");
     } else if (existing.is_email_confirmed) {
       // If already confirmed, no need to send confirmation again
       return new Response(JSON.stringify({ success: true, already_confirmed: true }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
     } else {
-      const { error: updateErr } = await supabase
-        .from("leads")
-        .update({
-          name: trimmedName,
-          industry: trimmedIndustry,
-          confirmation_token: token,
-          last_confirmation_sent_at: new Date().toISOString(),
-        })
-        .eq("email", trimmedEmail);
-      if (updateErr) throw updateErr;
+      let success = false;
+      for (let attempt = 0; attempt < MAX_RETRIES && !success; attempt++) {
+        const { error: updateErr } = await supabase
+          .from("leads")
+          .update({
+            name: trimmedName,
+            industry: trimmedIndustry,
+            confirmation_token: token,
+            last_confirmation_sent_at: new Date().toISOString(),
+          })
+          .eq("email", trimmedEmail);
+        if (!updateErr) {
+          success = true;
+          break;
+        }
+        // @ts-ignore
+        if (updateErr.code === "23505") {
+          token = crypto.randomUUID();
+          continue;
+        }
+        throw updateErr;
+      }
+      if (!success) throw new Error("Failed to update lead after retries");
     }
 
     const confirmUrl = buildConfirmUrl(token, redirect_to);

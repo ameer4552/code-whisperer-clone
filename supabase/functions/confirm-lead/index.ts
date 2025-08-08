@@ -18,7 +18,8 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const token = url.searchParams.get("token");
+    const tokenParam = url.searchParams.get("token") || url.searchParams.get("t");
+    const token = tokenParam?.trim() || null;
     const redirectTo = url.searchParams.get("redirect") || `${url.origin}/lead-confirmed`;
 
     if (!token) {
@@ -33,6 +34,7 @@ serve(async (req) => {
 
     if (selErr) throw selErr;
     if (!lead) {
+      console.log("confirm-lead: token not found or expired", { token });
       return new Response("Invalid or expired token", { status: 400, headers: corsHeaders });
     }
 

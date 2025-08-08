@@ -65,12 +65,26 @@ serve(async (req) => {
       }
     }
 
-    const token = crypto.randomUUID();
-    const { error: updErr } = await supabase
-      .from('leads')
-      .update({ confirmation_token: token, last_confirmation_sent_at: new Date().toISOString() })
-      .eq('id', lead.id);
-    if (updErr) throw updErr;
+    let token = crypto.randomUUID();
+    const MAX_RETRIES = 5;
+    let success = false;
+    for (let attempt = 0; attempt < MAX_RETRIES && !success; attempt++) {
+      const { error: updErr } = await supabase
+        .from('leads')
+        .update({ confirmation_token: token, last_confirmation_sent_at: new Date().toISOString() })
+        .eq('id', lead.id);
+      if (!updErr) {
+        success = true;
+        break;
+      }
+      // @ts-ignore - unique violation on confirmation_token
+      if (updErr.code === '23505') {
+        token = crypto.randomUUID();
+        continue;
+      }
+      throw updErr;
+    }
+    if (!success) throw new Error('Failed to update token after retries');
 
     const confirmUrl = buildConfirmUrl(token, redirect_to);
     const html = `
