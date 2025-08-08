@@ -84,7 +84,7 @@ serve(async (req) => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: 'Innovation Community <testing-email@lovable.dev>',
+      from: 'Your App <onboarding@resend.dev>',
       to: [trimmedEmail],
       subject: 'Your confirmation link',
       html,
