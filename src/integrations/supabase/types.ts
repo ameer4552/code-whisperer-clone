@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      leads: {
+        Row: {
+          email: string
+          id: string
+          industry: string
+          name: string
+          submitted_at: string
+          user_id: string
+        }
+        Insert: {
+          email: string
+          id?: string
+          industry: string
+          name: string
+          submitted_at?: string
+          user_id: string
+        }
+        Update: {
+          email?: string
+          id?: string
+          industry?: string
+          name?: string
+          submitted_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          first_name: string | null
+          id: string
+          is_confirmed: boolean
+          last_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          first_name?: string | null
+          id: string
+          is_confirmed?: boolean
+          last_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          is_confirmed?: boolean
+          last_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
