@@ -50,6 +50,15 @@ ip_version = "ipv4"
 [functions.send-confirmation]
 verify_jwt = false
 
+[functions.submit-lead]
+verify_jwt = false
+
+[functions.confirm-lead]
+verify_jwt = false
+
+[functions.resend-lead-confirmation]
+verify_jwt = false
+
 [[edge_runtime.policies]]
 entrypoint = "main"
 source = """
@@ -57,3 +66,4 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 console.log("Hello from Functions!")
 """
+

@@ -11,6 +11,7 @@ const queryClient = new QueryClient();
 
 const Auth = lazy(() => import("./pages/Auth"));
 const Confirm = lazy(() => import("./pages/Confirm"));
+const LeadConfirmed = lazy(() => import("./pages/LeadConfirmed"));
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Suspense fallback={null}><Auth /></Suspense>} />
           <Route path="/confirm" element={<Suspense fallback={null}><Confirm /></Suspense>} />
+          <Route path="/lead-confirmed" element={<Suspense fallback={null}><LeadConfirmed /></Suspense>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

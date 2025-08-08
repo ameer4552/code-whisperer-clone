@@ -16,28 +16,43 @@ export type Database = {
     Tables: {
       leads: {
         Row: {
+          confirmation_sent_at: string
+          confirmation_token: string | null
+          confirmed_at: string | null
           email: string
           id: string
           industry: string
+          is_email_confirmed: boolean
+          last_confirmation_sent_at: string | null
           name: string
           submitted_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
+          confirmation_sent_at?: string
+          confirmation_token?: string | null
+          confirmed_at?: string | null
           email: string
           id?: string
           industry: string
+          is_email_confirmed?: boolean
+          last_confirmation_sent_at?: string | null
           name: string
           submitted_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
+          confirmation_sent_at?: string
+          confirmation_token?: string | null
+          confirmed_at?: string | null
           email?: string
           id?: string
           industry?: string
+          is_email_confirmed?: boolean
+          last_confirmation_sent_at?: string | null
           name?: string
           submitted_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }

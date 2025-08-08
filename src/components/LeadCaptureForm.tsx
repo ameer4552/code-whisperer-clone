@@ -7,7 +7,7 @@ import { validateLeadForm, ValidationError } from '@/lib/validation';
 import { supabase } from '@/integrations/supabase/client';
 import { useLeadStore } from '@/lib/lead-store';
 import { useToast } from '@/components/ui/use-toast';
-import { Link } from 'react-router-dom';
+
 
 export const LeadCaptureForm = () => {
   const [formData, setFormData] = useState({ name: '', email: '', industry: '' });
@@ -16,30 +16,6 @@ export const LeadCaptureForm = () => {
   const [honeypot, setHoneypot] = useState('');
   const { setSubmitted, addLead, sessionLeads } = useLeadStore();
   const { toast } = useToast();
-
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      const user = session?.user ?? null;
-      setIsAuthenticated(!!user);
-      setUserId(user?.id ?? null);
-      setIsConfirmed(!!user?.email_confirmed_at);
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const user = session?.user ?? null;
-      setIsAuthenticated(!!user);
-      setUserId(user?.id ?? null);
-      setIsConfirmed(!!user?.email_confirmed_at);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
 
   const getFieldError = (field: string) => {
     return validationErrors.find(error => error.field === field)?.message;
@@ -54,32 +30,23 @@ export const LeadCaptureForm = () => {
     setValidationErrors(errors);
     if (errors.length > 0) return;
 
-    if (!isAuthenticated) {
-      toast({ title: 'Please log in', description: 'Sign up or log in before submitting a lead.', variant: 'destructive' });
-      return;
-    }
-
-    if (!isConfirmed) {
-      toast({ title: 'Verify your email', description: 'Please confirm your email, then try again.', variant: 'destructive' });
-      return;
-    }
 
     setIsSubmitting(true);
     try {
-      const leadRow = {
-        user_id: userId as string,
+      const payload = {
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         industry: formData.industry,
+        redirect_to: `${window.location.origin}/lead-confirmed`,
       };
 
-      const { error } = await supabase.from('leads').insert([leadRow]);
-      if (error) throw error;
+      const { data, error: submitError } = await supabase.functions.invoke('submit-lead', { body: payload });
+      if (submitError) throw submitError;
 
-      addLead({ name: leadRow.name, email: leadRow.email, submitted_at: new Date().toISOString() });
+      addLead({ name: payload.name, email: payload.email, submitted_at: new Date().toISOString() });
       setSubmitted(true);
       setFormData({ name: '', email: '', industry: '' });
-      toast({ title: 'Lead submitted', description: 'Thank you! We will be in touch soon.' });
+      toast({ title: 'Almost there!', description: 'Check your email for a confirmation link.' });
     } catch (err: any) {
       console.error('Error submitting lead:', err);
       toast({ title: 'Submission failed', description: err.message ?? 'Please try again', variant: 'destructive' });
