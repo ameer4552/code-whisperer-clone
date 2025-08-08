@@ -45,10 +45,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-    const contentType = (req.headers.get("content-type") || "").toLowerCase();
-    if (!contentType.includes("application/json")) {
-      return new Response(JSON.stringify({ error: "Unsupported content type" }), { status: 415, headers: { "Content-Type": "application/json", ...corsHeaders } });
-    }
+    try {
+      const contentType = (req.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("application/json")) {
+        return new Response(JSON.stringify({ error: "Unsupported content type" }), { status: 415, headers: { "Content-Type": "application/json", ...corsHeaders } });
+      }
 
     const { name, email, industry, redirect_to }: SubmitLeadRequest = await req.json();
 
@@ -168,7 +169,8 @@ serve(async (req) => {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
-  } catch (error: any) {
+  } // end try
+  catch (error: any) {
     console.error("Error in submit-lead:", error);
     return new Response(JSON.stringify({ error: error.message || "Unknown error" }), {
       status: 500,

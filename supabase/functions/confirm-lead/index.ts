@@ -11,6 +11,23 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+// Safe redirect handling
+const DEFAULT_SITE_URL = Deno.env.get("SITE_URL") || "http://127.0.0.1:3000";
+const ALLOWED_REDIRECT_HOSTS = new Set(["127.0.0.1", "localhost"]);
+function buildSafeRedirect(input: string | null): string {
+  const fallback = new URL("/lead-confirmed", DEFAULT_SITE_URL).toString();
+  if (!input) return fallback;
+  try {
+    const u = new URL(input);
+    if ((u.protocol === "http:" || u.protocol === "https:") && ALLOWED_REDIRECT_HOSTS.has(u.hostname)) {
+      return u.toString();
+    }
+    return fallback;
+  } catch {
+    if (!input.startsWith("/") || input.startsWith("//")) return fallback;
+    return new URL(input, DEFAULT_SITE_URL).toString();
+  }
+}
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -20,8 +37,8 @@ serve(async (req) => {
     const url = new URL(req.url);
     const tokenParam = url.searchParams.get("token") || url.searchParams.get("t");
     const token = tokenParam?.trim() || null;
-    const redirectTo = url.searchParams.get("redirect") || `${url.origin}/lead-confirmed`;
-
+    const redirectToRaw = url.searchParams.get("redirect");
+    const redirectTo = buildSafeRedirect(redirectToRaw);
     if (!token) {
       return new Response("Missing token", { status: 400, headers: corsHeaders });
     }
