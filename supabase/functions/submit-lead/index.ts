@@ -8,27 +8,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DEFAULT_SITE_URL = Deno.env.get("SITE_URL") || "http://127.0.0.1:3000";
-const ALLOWED_ORIGINS = new Set([
-  DEFAULT_SITE_URL,
-  "http://localhost:3000",
-  "https://localhost:3000",
-]);
-function isAllowedOrigin(origin: string | null): boolean {
-  if (!origin) return true; // allow non-browser clients
-  try {
-    const u = new URL(origin);
-    return (
-      u.origin === DEFAULT_SITE_URL ||
-      ALLOWED_ORIGINS.has(u.origin) ||
-      u.hostname === "127.0.0.1" ||
-      u.hostname === "localhost"
-    );
-  } catch {
-    return false;
-  }
-}
-
 const resend = new Resend(Deno.env.get("RESEND_API_KEY") || "");
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -72,23 +51,13 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unsupported content type" }), { status: 415, headers: { "Content-Type": "application/json", ...corsHeaders } });
       }
 
-      const origin = req.headers.get("origin");
-      if (!isAllowedOrigin(origin)) {
-        return new Response(JSON.stringify({ error: "Origin not allowed" }), { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } });
-      }
+    const { name, email, industry, redirect_to }: SubmitLeadRequest = await req.json();
 
-      const { name, email, industry, redirect_to }: SubmitLeadRequest = await req.json();
-
-    // Basic validation + hardening
+    // Basic validation
     const trimmedName = (name || "").trim();
     const trimmedEmail = (email || "").trim().toLowerCase();
-    const trimmedIndustry = (industry || "").trim().toLowerCase();
-
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) && trimmedEmail.length <= 254;
-    const nameOk = trimmedName.length >= 2 && trimmedName.length <= 100 && /^[\p{L}0-9 .,'-]+$/u.test(trimmedName);
-    const industryOk = trimmedIndustry.length > 0 && trimmedIndustry.length <= 50;
-
-    if (!nameOk || !emailOk || !industryOk) {
+    const trimmedIndustry = (industry || "").trim();
+    if (!trimmedName || !trimmedEmail || !trimmedIndustry || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       return new Response(JSON.stringify({ error: "Invalid input" }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
