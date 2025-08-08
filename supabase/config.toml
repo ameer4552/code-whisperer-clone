@@ -1,0 +1,59 @@
+project_id = "fwjfenbkcgfgkaijgtsi"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_signup = true
+email_double_confirm_changes = true
+enable_manual_linking = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+test_otp = "123456"
+
+[edge_runtime]
+enabled = true
+ip_version = "ipv4"
+
+[functions.send-confirmation]
+verify_jwt = false
+
+[[edge_runtime.policies]]
+entrypoint = "main"
+source = """
+import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+
+console.log("Hello from Functions!")
+"""
