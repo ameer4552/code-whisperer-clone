@@ -103,8 +103,11 @@ serve(async (req) => {
       }
       if (!success) throw new Error("Failed to insert lead after retries");
     } else if (existing.is_email_confirmed) {
-      // Already confirmed; respond generically to avoid enumeration
-      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
+      // Duplicate and already confirmed: do not resend, signal duplicate explicitly
+      return new Response(
+        JSON.stringify({ error: "Lead already exists for this email", code: "LEAD_EXISTS", alreadyConfirmed: true, resent: false }),
+        { status: 409, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     } else {
       // Existing unconfirmed lead: update token if needed, optionally resend, and signal duplicate explicitly
       const lastSentAt = (existing as any).last_confirmation_sent_at ? new Date((existing as any).last_confirmation_sent_at) : null;
